@@ -45,7 +45,42 @@ deploy
 | `terraform/do-image.nix` | DigitalOceanイメージビルド設定 |
 | `deploy/nixos-configurations.nix` | NixOS設定ビルダー |
 | `deploy/droplet-configuration.nix` | Dropletシステム設定 |
+| `deploy/openclaw.nix` | OpenClaw Gateway + sops-nix シークレット設定 |
 | `deploy/deployment.nix` | deploy-rs設定 |
+| `.sops.yaml` | sops 暗号化ルール (age キー設定) |
+| `secrets/openclaw.yaml` | 暗号化済みシークレット |
+
+## OpenClaw セットアップ
+
+### 1. age キーを生成
+
+```bash
+nix shell nixpkgs#age -c age-keygen -o keys.txt
+# 出力される公開鍵を .sops.yaml の &admin にコピー
+```
+
+### 2. Droplet をデプロイしてホスト鍵を取得
+
+```bash
+nix run .#tf-apply
+ssh-keyscan $(tofu output -raw droplet_ip) | nix run nixpkgs#ssh-to-age
+# 出力を .sops.yaml の &server にコピー
+```
+
+### 3. シークレットを暗号化
+
+```bash
+SOPS_AGE_KEY_FILE=./keys.txt nix shell nixpkgs#sops -c sops secrets/openclaw.yaml
+# エディタで API キー等を入力して保存
+```
+
+### 4. NixOS をデプロイ
+
+```bash
+deploy
+```
+
+OpenClaw Gateway: `http://<DROPLET_IP>:18789`
 
 ## 削除
 

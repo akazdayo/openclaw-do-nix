@@ -1,0 +1,15 @@
+keys:
+  # あなたの age 公開鍵 (ローカルマシン)
+  # age-keygen で生成: age-keygen -o keys.txt
+  - &admin age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+  # Droplet の SSH ホスト鍵から導出した age 公開鍵
+  # 取得方法: ssh-keyscan <DROPLET_IP> | nix run nixpkgs#ssh-to-age
+  - &server age1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+creation_rules:
+  - path_regex: secrets/.*\.yaml$
+    key_groups:
+      - age:
+          - *admin
+          - *server

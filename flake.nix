@@ -11,35 +11,56 @@
       url = "github:serokell/deploy-rs";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    nix-openclaw = {
+      url = "github:openclaw/nix-openclaw";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = inputs @ {
-    self,
-    nixpkgs,
-    flake-utils,
-    terranix,
-    deploy-rs,
-    ...
-  }: let
-    # --- NixOS Configurations ---
-    nixosConfigurations = {
-      # DigitalOcean image build用
-      do = nixpkgs.lib.nixosSystem {
-        system = "x86_64-linux";
-        modules = [
-          "${nixpkgs}/nixos/modules/virtualisation/digital-ocean-image.nix"
-          ./terraform/do-image.nix
-        ];
-      };
+  outputs =
+    inputs@{
+      self,
+      nixpkgs,
+      flake-utils,
+      terranix,
+      deploy-rs,
+      nix-openclaw,
+      sops-nix,
+      ...
+    }:
+    let
+      # --- NixOS Configurations ---
+      nixosConfigurations = {
+        # DigitalOcean image build用
+        do = nixpkgs.lib.nixosSystem {
+          system = "x86_64-linux";
+          modules = [
+            "${nixpkgs}/nixos/modules/virtualisation/digital-ocean-image.nix"
+            ./terraform/do-image.nix
+          ];
+        };
 
-      # Droplet用 NixOS Configuration
-      droplet = (import ./deploy/nixos-configurations.nix {inherit self nixpkgs;}).droplet;
-    };
-  in
+        # Droplet用 NixOS Configuration
+        droplet =
+          (import ./deploy/nixos-configurations.nix {
+            inherit
+              self
+              nixpkgs
+              nix-openclaw
+              sops-nix
+              ;
+          }).droplet;
+      };
+    in
     {
       inherit nixosConfigurations;
 
       modules.dropletConfiguration = ./deploy/droplet-configuration.nix;
+      modules.openclawConfiguration = ./deploy/openclaw.nix;
 
       # --- Deploy-RS ---
       deploy = import ./deploy/deployment.nix {
@@ -47,14 +68,16 @@
       };
     }
     // flake-utils.lib.eachDefaultSystem (
-      system: let
+      system:
+      let
         pkgs = nixpkgs.legacyPackages.${system};
         terraform = pkgs.opentofu;
         terraformConfiguration = terranix.lib.terranixConfiguration {
           inherit system;
-          modules = [./terraform/terraform.nix];
+          modules = [ ./terraform/terraform.nix ];
         };
-      in {
+      in
+      {
         formatter = pkgs.alejandra;
 
         # DigitalOcean image build (既存)
